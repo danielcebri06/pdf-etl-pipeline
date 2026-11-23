@@ -1,0 +1,19 @@
+# Java / Maven
+target/
+*.jar
+*.war
+
+# IntelliJ IDEA / VS Code
+.idea/
+*.iml
+.vscode/
+
+# Node / React (para el futuro frontend)
+node_modules/
+dist/
+.env
+.env.local
+
+# Sistema
+.DS_Store
+Thumbs.db
