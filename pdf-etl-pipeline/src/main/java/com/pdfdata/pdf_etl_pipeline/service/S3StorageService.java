@@ -8,6 +8,10 @@ import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import io.minio.RemoveObjectArgs;
+import io.minio.GetObjectArgs;
+import java.io.InputStream;
+import java.util.Optional;
 
 import java.io.ByteArrayInputStream;
 
@@ -39,6 +43,20 @@ public class S3StorageService {
 
         ensureBucketExists();
     }
+    public Optional<byte[]> downloadBytes(String objectKey) {
+        if (objectKey == null || objectKey.isBlank()) return Optional.empty();
+        try (InputStream stream = minioClient.getObject(
+                GetObjectArgs.builder()
+                        .bucket(bucketName)
+                        .object(objectKey)
+                        .build()
+        )) {
+            return Optional.of(stream.readAllBytes());
+        } catch (Exception e) {
+            log.warn("No se pudo recuperar '{}' desde S3: {}", objectKey, e.getMessage());
+            return Optional.empty();
+        }
+    }
 
     private void ensureBucketExists() {
         try {
@@ -68,5 +86,21 @@ public class S3StorageService {
             );
         }
         return objectKey;
+    }
+
+    public void deleteObject(String objectKey) {
+        if (objectKey == null || objectKey.isBlank()) return;
+        try {
+            minioClient.removeObject(
+                    RemoveObjectArgs.builder()
+                            .bucket(bucketName)
+                            .object(objectKey)
+                            .build()
+            );
+            log.info("Objeto eliminado de S3: {}", objectKey);
+        } catch (Exception e) {
+            // Si LocalStack se reinició y el archivo ya no existe, no bloqueamos el borrado en PostgreSQL
+            log.warn("No se pudo eliminar '{}' de S3: {}", objectKey, e.getMessage());
+        }
     }
 }

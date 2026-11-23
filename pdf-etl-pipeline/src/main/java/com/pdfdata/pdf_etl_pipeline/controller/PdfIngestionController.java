@@ -15,6 +15,9 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.util.Arrays;
 import java.util.List;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import java.nio.charset.StandardCharsets;
 
 @RestController
 @RequestMapping(value = "/api/v1/pdfs", produces = MediaType.APPLICATION_JSON_VALUE)
@@ -32,6 +35,21 @@ public class PdfIngestionController {
         return Arrays.stream(files)
                 .map(pdfEtlService::processFile)
                 .toList();
+    }
+
+    @GetMapping(value = "/{id}/pdf", produces = MediaType.APPLICATION_PDF_VALUE)
+    public ResponseEntity<byte[]> getPdfById(@PathVariable Long id) {
+        return metadataRepository.findById(id)
+                .flatMap(doc -> pdfEtlService.getRawPdfBytes(doc).map(bytes -> {
+                    ContentDisposition disposition = ContentDisposition.inline()
+                            .filename(doc.getFileName(), StandardCharsets.UTF_8)
+                            .build();
+                    return ResponseEntity.ok()
+                            .contentType(MediaType.APPLICATION_PDF)
+                            .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
+                            .body(bytes);
+                }))
+                .orElse(ResponseEntity.notFound().build());
     }
 
     @GetMapping
@@ -57,5 +75,21 @@ public class PdfIngestionController {
     @GetMapping("/stats")
     public GoldStatsDto getGoldStats() {
         return goldAnalyticsService.getPipelineStats();
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteDocument(@PathVariable Long id) {
+        return pdfEtlService.deleteDocument(id)
+                ? ResponseEntity.noContent().build()
+                : ResponseEntity.notFound().build();
+    }
+
+    @DeleteMapping("/quarantine/{id}")
+    public ResponseEntity<Void> deleteQuarantineRecord(@PathVariable Long id) {
+        if (!quarantineRepository.existsById(id)) {
+            return ResponseEntity.notFound().build();
+        }
+        quarantineRepository.deleteById(id);
+        return ResponseEntity.noContent().build();
     }
 }

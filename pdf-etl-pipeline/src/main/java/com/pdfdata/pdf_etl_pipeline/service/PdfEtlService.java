@@ -36,6 +36,20 @@ public class PdfEtlService {
             .enable(SerializationFeature.INDENT_OUTPUT)
             .build();
 
+    public Optional<byte[]> getRawPdfBytes(PdfMetadata doc) {
+        return s3StorageService.downloadBytes(doc.getS3BronzeKey());
+    }
+
+    public boolean deleteDocument(Long id) {
+        return metadataRepository.findById(id).map(doc -> {
+            s3StorageService.deleteObject(doc.getS3BronzeKey());
+            s3StorageService.deleteObject(doc.getS3XmlKey());
+            metadataRepository.delete(doc);
+            log.info("Documento eliminado de S3 y PostgreSQL (ID={})", id);
+            return true;
+        }).orElse(false);
+    }
+
     public Map<String, Object> processFile(MultipartFile file) {
         String originalName = file.getOriginalFilename() != null ? file.getOriginalFilename() : "unnamed.pdf";
         long fileSize = file.getSize();
@@ -168,4 +182,6 @@ public class PdfEtlService {
         if (calendar == null) return null;
         return LocalDateTime.ofInstant(calendar.toInstant(), ZoneId.systemDefault());
     }
+
+
 }
